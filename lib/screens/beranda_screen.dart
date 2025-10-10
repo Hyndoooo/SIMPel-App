@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'notifikasi_screen.dart';
 import 'obrolan/obrolan_screen.dart';
 import 'akun/akun_screen.dart';
+import 'nilai/periodekelas_screen.dart';
+import 'kehadiran/kehadiran_screen.dart';
+import 'belajar/kemajuanbelajar_screen.dart';
+import 'modul/periode_screen.dart';
+import 'spp/spp_screen.dart';
 
 class BerandaScreen extends StatefulWidget {
   const BerandaScreen({super.key});
@@ -34,7 +39,6 @@ class _BerandaScreenState extends State<BerandaScreen> {
               MaterialPageRoute(builder: (context) => const ObrolanScreen()),
             );
           } else if (index == 3) {
-            // Navigasi ke AkunScreen
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const AkunScreen()),
@@ -59,12 +63,11 @@ class _BerandaScreenState extends State<BerandaScreen> {
   }
 
   Widget _buildBody() {
-    // Body Beranda tetap sama
     return SafeArea(
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // Header
+            // ================= Header =================
             Container(
               margin: const EdgeInsets.all(16),
               width: double.infinity,
@@ -123,7 +126,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
                     ],
                   ),
                   const SizedBox(height: 60),
-                  // Search Bar
+                  // ================= Search Bar =================
                   Container(
                     height: 45,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -174,8 +177,10 @@ class _BerandaScreenState extends State<BerandaScreen> {
                 ],
               ),
             ),
+
             const SizedBox(height: 20),
-            // Jadwal Hari Ini
+
+            // ================= Jadwal Hari Ini =================
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.all(16),
@@ -223,8 +228,10 @@ class _BerandaScreenState extends State<BerandaScreen> {
                 ],
               ),
             ),
+
             const SizedBox(height: 20),
-            // MySchools
+
+            // ================= MySchools =================
             Container(
               alignment: Alignment.centerLeft,
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -243,6 +250,8 @@ class _BerandaScreenState extends State<BerandaScreen> {
               ),
             ),
             const SizedBox(height: 16),
+
+            // ================= Menu Grid =================
             GridView.count(
               crossAxisCount: 4,
               shrinkWrap: true,
@@ -251,13 +260,13 @@ class _BerandaScreenState extends State<BerandaScreen> {
               crossAxisSpacing: 16,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
-                _buildMenuItem(Icons.assignment, "Nilai"),
-                _buildMenuItem(Icons.check_circle, "Kehadiran"),
-                _buildMenuItem(Icons.rocket, "Kemajuan Belajar"),
-                _buildMenuItem(Icons.note, "Catatan Perkembangan"),
-                _buildMenuItem(Icons.download, "Download E-Raport"),
-                _buildMenuItem(Icons.menu_book, "Modul Pelajaran"),
-                _buildMenuItem(Icons.payment, "SPP"),
+                _buildMenuItem(Icons.assignment, "Nilai", context),
+                _buildMenuItem(Icons.check_circle, "Kehadiran", context),
+                _buildMenuItem(Icons.rocket, "Kemajuan Belajar", context),
+                _buildMenuItem(Icons.note, "Catatan Perkembangan", context),
+                _buildMenuItem(Icons.download, "Download E-Raport", context),
+                _buildMenuItem(Icons.menu_book, "Modul Pelajaran", context),
+                _buildMenuItem(Icons.payment, "SPP", context),
               ],
             ),
             const SizedBox(height: 20),
@@ -267,30 +276,69 @@ class _BerandaScreenState extends State<BerandaScreen> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: const Color(0xFF4A6CF7), size: 32),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-          ),
-        ],
+  // 🔹 Menu Item dengan Navigasi
+  Widget _buildMenuItem(IconData icon, String title, BuildContext context) {
+    return InkWell(
+      onTap: () {
+        if (title == "Nilai") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PeriodekelasScreen()),
+          );
+        } else if (title == "Kehadiran") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const KehadiranScreen()),
+          );
+        } else if (title == "Kemajuan Belajar") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const KemajuanbelajarScreen(),
+            ),
+          );
+        } else if (title == "Modul Pelajaran") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PeriodeScreen()),
+          );
+        } else if (title == "SPP") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SppScreen()),
+          );
+        } else {
+          // Menu lain belum tersedia
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("Menu $title belum tersedia")));
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFF4A6CF7), size: 32),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
       ),
     );
   }

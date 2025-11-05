@@ -42,7 +42,7 @@ class WelcomeScreen extends StatelessWidget {
 
                 // Title
                 const Text(
-                  "WELLCOME TO\nSIMPel",
+                  "WELCOME TO\nSIMPel",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 33, fontWeight: FontWeight.bold),
                 ),

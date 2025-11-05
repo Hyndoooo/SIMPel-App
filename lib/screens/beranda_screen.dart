@@ -263,7 +263,6 @@ class _BerandaScreenState extends State<BerandaScreen> {
                 _buildMenuItem(Icons.assignment, "Nilai", context),
                 _buildMenuItem(Icons.check_circle, "Kehadiran", context),
                 _buildMenuItem(Icons.rocket, "Kemajuan Belajar", context),
-                _buildMenuItem(Icons.note, "Catatan Perkembangan", context),
                 _buildMenuItem(Icons.download, "Download E-Raport", context),
                 _buildMenuItem(Icons.menu_book, "Modul Pelajaran", context),
                 _buildMenuItem(Icons.payment, "SPP", context),

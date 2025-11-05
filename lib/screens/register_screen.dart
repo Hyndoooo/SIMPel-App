@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/murid_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -9,8 +10,13 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _nisController = TextEditingController();
+  final TextEditingController _kelasController = TextEditingController();
+  final TextEditingController _genderController = TextEditingController();
+  final TextEditingController _waController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
@@ -18,12 +24,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
-  void _register() {
+  // indikator validasi password
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasDigit = false;
+  bool _hasMinLength = false;
+
+  void _register() async {
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Pendaftaran berhasil 🚀")));
+      // Tampilkan notifikasi loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Mengirim data ke server...")),
+      );
+
+      // Buat instance service
+      final service = MuridService();
+
+      // Panggil API Laravel untuk daftar murid
+      final success = await service.registerMurid(
+        nis: _nisController.text,
+        nama: _nameController.text,
+        email: _emailController.text,
+        kelas: _kelasController.text,
+        jenisKelamin: _genderController.text,
+        kataSandi: _passwordController.text,
+        nomerWhatsapp: _waController.text,
+      );
+
+      // Hapus snackbar loading
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // Cek hasil dari server
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Pendaftaran berhasil ✅"),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Setelah sukses, kembali ke halaman login
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Pendaftaran gagal ❌, periksa koneksi atau data."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
+  }
+
+  // fungsi validasi password kombinasi
+  bool _isPasswordValid(String password) {
+    final hasUppercase = password.contains(RegExp(r'[A-Z]'));
+    final hasLowercase = password.contains(RegExp(r'[a-z]'));
+    final hasDigit = password.contains(RegExp(r'[0-9]'));
+    final hasMinLength = password.length >= 8;
+
+    return hasUppercase && hasLowercase && hasDigit && hasMinLength;
   }
 
   @override
@@ -38,7 +98,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        // biar nggak overflow
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(
@@ -62,9 +121,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return "Email tidak boleh kosong";
-                    if (!value.contains('@')) return "Format email tidak valid";
+                    }
+                    if (!value.contains('@')) {
+                      return "Format email tidak valid";
+                    }
                     return null;
                   },
                 ),
@@ -85,11 +147,106 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return "Nama tidak boleh kosong";
-                    return null;
+                  validator: (value) => value == null || value.isEmpty
+                      ? "Nama tidak boleh kosong"
+                      : null,
+                ),
+                const SizedBox(height: 20),
+
+                // NIS
+                const Text(
+                  "NIS*",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                TextFormField(
+                  controller: _nisController,
+                  decoration: InputDecoration(
+                    hintText: "Masukkan NIS",
+                    prefixIcon: const Icon(Icons.badge_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) =>
+                      value == null || value.isEmpty ? "NIS wajib diisi" : null,
+                ),
+                const SizedBox(height: 20),
+
+                // Kelas
+                const Text(
+                  "Kelas*",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                TextFormField(
+                  controller: _kelasController,
+                  decoration: InputDecoration(
+                    hintText: "Contoh: IX A",
+                    prefixIcon: const Icon(Icons.class_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  validator: (value) => value == null || value.isEmpty
+                      ? "Kelas wajib diisi"
+                      : null,
+                ),
+                const SizedBox(height: 20),
+
+                // Jenis Kelamin
+                const Text(
+                  "Jenis Kelamin*",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.wc_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  value: null,
+                  hint: const Text("Pilih Jenis Kelamin"),
+                  items: const [
+                    DropdownMenuItem(
+                      value: "Laki-laki",
+                      child: Text("Laki-laki"),
+                    ),
+                    DropdownMenuItem(
+                      value: "Perempuan",
+                      child: Text("Perempuan"),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    _genderController.text = value ?? '';
                   },
+                  validator: (value) =>
+                      value == null ? "Pilih jenis kelamin" : null,
+                ),
+                const SizedBox(height: 20),
+
+                // No. WA
+                const Text(
+                  "No. WhatsApp*",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                TextFormField(
+                  controller: _waController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    hintText: "Contoh: 081234567890",
+                    prefixIcon: const Icon(Icons.phone_android_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  validator: (value) => value == null || value.isEmpty
+                      ? "Nomor WA wajib diisi"
+                      : null,
                 ),
                 const SizedBox(height: 20),
 
@@ -102,6 +259,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  onChanged: (value) {
+                    setState(() {
+                      _hasUppercase = value.contains(RegExp(r'[A-Z]'));
+                      _hasLowercase = value.contains(RegExp(r'[a-z]'));
+                      _hasDigit = value.contains(RegExp(r'[0-9]'));
+                      _hasMinLength = value.length >= 8;
+                    });
+                  },
                   decoration: InputDecoration(
                     hintText: "Buat kata sandi",
                     prefixIcon: const Icon(Icons.lock_outline),
@@ -122,24 +287,94 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return "Password tidak boleh kosong";
-                    if (value.length < 8) return "Password minimal 8 karakter";
+                    }
+                    if (!_isPasswordValid(value)) {
+                      return "Password harus ada huruf besar, huruf kecil, angka, dan min. 8 karakter";
+                    }
                     return null;
                   },
                 ),
-                const SizedBox(height: 2),
 
-                // Keterangan password
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const SizedBox(height: 8),
+
+                // Indikator Kriteria Password (dua kolom)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Min. 8 Karakter"),
-                    Text("Huruf Kecil"),
-                    Text("Huruf Kapital"),
-                    Text("Angka"),
+                    // Kolom kiri
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.check,
+                                size: 16,
+                                color: _hasMinLength
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text('Min. 8 Karakter'),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.check,
+                                size: 16,
+                                color: _hasLowercase
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text('Huruf Kecil'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Kolom kanan
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.check,
+                                size: 16,
+                                color: _hasUppercase
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text('Huruf Kapital'),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.check,
+                                size: 16,
+                                color: _hasDigit ? Colors.green : Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text('Angka'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
+
                 const SizedBox(height: 20),
 
                 // Konfirmasi Kata Sandi
@@ -171,10 +406,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return "Konfirmasi password wajib diisi";
-                    if (value != _passwordController.text)
+                    }
+                    if (value != _passwordController.text) {
                       return "Password tidak sama";
+                    }
                     return null;
                   },
                 ),
@@ -216,7 +453,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Atau daftar dengan
                 const Center(child: Text("Atau daftar dengan")),
                 const SizedBox(height: 12),
 
@@ -242,15 +478,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Link sudah punya akun
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text("Sudah punya akun? "),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context); // balik ke login
-                      },
+                      onTap: () => Navigator.pop(context),
                       child: const Text(
                         "Masuk",
                         style: TextStyle(

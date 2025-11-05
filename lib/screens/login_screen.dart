@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'register_screen.dart';
 import 'beranda_screen.dart';
+import '../services/login_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,21 +17,74 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
-  void _login() {
+  // === Fungsi Login ===
+  void _login() async {
     if (_formKey.currentState!.validate()) {
-      // Kalau valid → pindah ke Beranda
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const BerandaScreen()),
+      setState(() => _isLoading = true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Sedang memproses login...")),
       );
+
+      final service = LoginService();
+      final success = await service.loginMurid(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (success) {
+        // ✅ Ambil detail murid dari API
+        final muridData = await service.getMuridByEmail(
+          _emailController.text.trim(),
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        if (muridData != null) {
+          await prefs.setString('email', muridData['email'] ?? '');
+          await prefs.setString('nama', muridData['nama'] ?? '');
+          await prefs.setString('nis', muridData['nis'] ?? '');
+          await prefs.setString('kelas', muridData['kelas'] ?? '');
+          await prefs.setString(
+            'jenis_kelamin',
+            muridData['jenis_kelamin'] ?? '',
+          );
+          await prefs.setString('telepon', muridData['nomer_whatsapp'] ?? '');
+        }
+
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Login berhasil ✅"),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const BerandaScreen()),
+        );
+      } else {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Login gagal ❌, periksa email dan kata sandi."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true, // biar body geser pas keyboard muncul
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text("Masuk"),
         leading: IconButton(
@@ -45,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Email field
+              // === Email ===
               const Text(
                 "Email*",
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -72,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Password field
+              // === Kata Sandi ===
               const Text(
                 "Kata Sandi*",
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -112,13 +167,11 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Lupa kata sandi
+              // === Lupa Kata Sandi ===
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {
-                    // Aksi lupa kata sandi
-                  },
+                  onPressed: () {},
                   child: const Text(
                     "Lupa kata sandi?",
                     style: TextStyle(color: Color(0xFF4A6CF7)),
@@ -127,50 +180,54 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
 
-              // Tombol Masuk
+              // === Tombol Masuk ===
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _login,
+                  onPressed: _isLoading ? null : _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4A6CF7),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          "Masuk",
-                          style: TextStyle(fontSize: 16, color: Colors.white),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Align(
+                              alignment: Alignment.center,
+                              child: Text(
+                                "Masuk",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Icon(
+                                Icons.arrow_forward,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Icon(
-                          Icons.arrow_forward,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Register link
+              // === Link ke Daftar ===
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text("Belum punya akun? "),
                   GestureDetector(
                     onTap: () {
-                      // ⬅️ pindah ke RegisterScreen
                       Navigator.push(
                         context,
                         MaterialPageRoute(

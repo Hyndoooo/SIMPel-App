@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/murid_service.dart';
+import '../services/login_service.dart';
+
 import 'register_screen.dart';
 import 'beranda_screen.dart';
-import '../services/login_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,7 +23,28 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
 
-  // === Fungsi Login ===
+  // Firebase & Google Sign-In
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  // ===================== SharedPreferences =====================
+  Future<void> saveUserData(Map<String, dynamic> muridData) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('nama', muridData['nama'] ?? '');
+    await prefs.setString('email', muridData['email'] ?? '');
+    await prefs.setString('nis', muridData['nis'] ?? '');
+    await prefs.setString('kelas', muridData['kelas'] ?? '');
+    await prefs.setString('jenis_kelamin', muridData['jenis_kelamin'] ?? '');
+    await prefs.setString('telepon', muridData['nomer_whatsapp'] ?? '');
+    await prefs.setString('foto', muridData['foto_profil'] ?? '');
+  }
+
+  Future<void> clearUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
+
+  // ===================== Login Manual =====================
   void _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -35,42 +60,22 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (success) {
-        // ✅ Ambil detail murid dari API
         final muridData = await service.getMuridByEmail(
           _emailController.text.trim(),
         );
 
-        final prefs = await SharedPreferences.getInstance();
-        if (muridData != null) {
-          await prefs.setString('email', muridData['email'] ?? '');
-          await prefs.setString('nama', muridData['nama'] ?? '');
-          await prefs.setString('nis', muridData['nis'] ?? '');
-          await prefs.setString('kelas', muridData['kelas'] ?? '');
-          await prefs.setString(
-            'jenis_kelamin',
-            muridData['jenis_kelamin'] ?? '',
-          );
-          await prefs.setString('telepon', muridData['nomer_whatsapp'] ?? '');
-        }
+        if (muridData != null) await saveUserData(muridData);
 
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Login berhasil ✅"),
-            backgroundColor: Colors.green,
-          ),
-        );
-
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const BerandaScreen()),
+          MaterialPageRoute(builder: (_) => const BerandaScreen()),
         );
       } else {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Login gagal ❌, periksa email dan kata sandi."),
@@ -81,6 +86,80 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // ===================== Login Google =====================
+  Future<User?> signInWithGoogle() async {
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null;
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user != null) {
+        await _saveUserToDatabase(user);
+      }
+
+      return user;
+    } catch (e) {
+      print("❌ Error Google Sign-In: $e");
+      return null;
+    }
+  }
+
+  Future<void> _saveUserToDatabase(User user) async {
+    try {
+      final muridData = await MuridService().registerOrGetMuridGoogle(
+        nama: user.displayName ?? '',
+        email: user.email ?? '',
+        foto: user.photoURL ?? '',
+      );
+
+      if (muridData != null) await saveUserData(muridData);
+    } catch (e) {
+      print("❌ Error simpan user: $e");
+    }
+  }
+
+  void handleGoogleSignIn() async {
+    final user = await signInWithGoogle();
+
+    if (user != null) {
+      final muridData = await MuridService().registerOrGetMuridGoogle(
+        nama: user.displayName ?? '',
+        email: user.email ?? '',
+        foto: user.photoURL ?? '',
+      );
+
+      if (muridData != null) {
+        await saveUserData(muridData);
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const BerandaScreen()),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Gagal ambil data murid setelah register"),
+          ),
+        );
+      }
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login Google gagal atau dibatalkan")),
+      );
+    }
+  }
+
+  // ===================== Build UI =====================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // === Email ===
+              // Email
               const Text(
                 "Email*",
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -116,18 +195,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
+                  if (value == null || value.isEmpty)
                     return "Email tidak boleh kosong";
-                  }
-                  if (!value.contains('@')) {
-                    return "Format email tidak valid";
-                  }
+                  if (!value.contains('@')) return "Format email tidak valid";
                   return null;
                 },
               ),
               const SizedBox(height: 20),
 
-              // === Kata Sandi ===
+              // Password
               const Text(
                 "Kata Sandi*",
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -156,18 +232,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
+                  if (value == null || value.isEmpty)
                     return "Password tidak boleh kosong";
-                  }
-                  if (value.length < 6) {
-                    return "Password minimal 6 karakter";
-                  }
+                  if (value.length < 6) return "Password minimal 6 karakter";
                   return null;
                 },
               ),
               const SizedBox(height: 12),
 
-              // === Lupa Kata Sandi ===
+              // Lupa password
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -180,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
 
-              // === Tombol Masuk ===
+              // Tombol Masuk Manual
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -219,9 +292,37 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // Tombol Google Sign-In
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: handleGoogleSignIn,
+                  icon: Image.asset(
+                    'assets/images/google.png',
+                    width: 24,
+                    height: 24,
+                  ),
+                  label: const Text(
+                    "Login dengan Google",
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    side: const BorderSide(color: Colors.grey, width: 0.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
 
-              // === Link ke Daftar ===
+              // Link ke Register
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -231,7 +332,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const RegisterScreen(),
+                          builder: (_) => const RegisterScreen(),
                         ),
                       );
                     },

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class LoginService {
-  final String baseUrl = "http://10.183.53.27:8000/api";
+  final String baseUrl = "http://10.118.148.27:8000/api";
 
   /// Fungsi login murid
   Future<bool> loginMurid({

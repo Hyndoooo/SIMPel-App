@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "938759955173",
+    "project_id": "simpel-f51bf",
+    "storage_bucket": "simpel-f51bf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:938759955173:android:4d190f3bedeefdc3f26a0c",
+        "android_client_info": {
+          "package_name": "com.example.simpel"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "938759955173-cj6j6u1pkc2oc2bf0mhogbapv9g0oq2e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.simpel",
+            "certificate_hash": "fb48c19d23e4a5a4a7f104829c1137aa943a37b2"
+          }
+        },
+        {
+          "client_id": "938759955173-nf4c9snr43d87iiq1rrm1fkq3pttafjs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtPWUHhLikaCAk-aO6esoNr6IRsB2Nces"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "938759955173-nf4c9snr43d87iiq1rrm1fkq3pttafjs.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

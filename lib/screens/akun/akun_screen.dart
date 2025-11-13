@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/murid_service.dart';
+import '../../services/auth_service.dart';
 import '../beranda_screen.dart';
 import '../notifikasi_screen.dart';
 import '../obrolan/obrolan_screen.dart';
@@ -23,8 +24,10 @@ class _AkunScreenState extends State<AkunScreen> {
   String nis = "-";
   String kelas = "-";
   String? fotoProfilUrl;
+  String? email;
 
   final MuridService _muridService = MuridService();
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
@@ -33,8 +36,10 @@ class _AkunScreenState extends State<AkunScreen> {
   }
 
   Future<void> _loadMuridData() async {
+    setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('email');
+    email = prefs.getString('email');
+
     print("📧 Email tersimpan: $email");
 
     if (email == null) {
@@ -42,7 +47,7 @@ class _AkunScreenState extends State<AkunScreen> {
       return;
     }
 
-    final muridData = await _muridService.getMuridByEmail(email);
+    final muridData = await _muridService.getMuridByEmail(email!);
     print("🧩 Data dari API: $muridData");
 
     if (muridData != null) {
@@ -50,7 +55,7 @@ class _AkunScreenState extends State<AkunScreen> {
         nama = muridData['nama'] ?? '-';
         nis = muridData['nis'] ?? '-';
         kelas = muridData['kelas'] ?? '-';
-        fotoProfilUrl = muridData['foto_profil']; // langsung pakai dari service
+        fotoProfilUrl = muridData['foto_profil'];
       });
     }
     setState(() => _isLoading = false);
@@ -58,33 +63,38 @@ class _AkunScreenState extends State<AkunScreen> {
 
   void _onNavBarTap(int index) {
     if (index == _currentIndex) return;
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const BerandaScreen()),
-      );
-    } else if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NotifikasiScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ObrolanScreen()),
-      );
+    Widget nextPage;
+    switch (index) {
+      case 0:
+        nextPage = const BerandaScreen();
+        break;
+      case 1:
+        nextPage = const NotifikasiScreen();
+        break;
+      case 2:
+        nextPage = const ObrolanScreen();
+        break;
+      default:
+        return;
     }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => nextPage),
+    );
   }
 
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    await _authService.signOut();
 
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-      (route) => false,
-    );
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -110,7 +120,7 @@ class _AkunScreenState extends State<AkunScreen> {
                   child: Row(
                     children: [
                       CircleAvatar(
-                        radius: 30,
+                        radius: 35,
                         backgroundColor: const Color(0xFF4A6CF7),
                         backgroundImage: fotoProfilUrl != null
                             ? NetworkImage(fotoProfilUrl!)
@@ -119,7 +129,7 @@ class _AkunScreenState extends State<AkunScreen> {
                             ? const Icon(
                                 Icons.person,
                                 color: Colors.white,
-                                size: 30,
+                                size: 35,
                               )
                             : null,
                       ),
@@ -136,9 +146,18 @@ class _AkunScreenState extends State<AkunScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(nis),
+                            Text("NIS: $nis"),
                             const SizedBox(height: 2),
-                            Text("Kelas - $kelas"),
+                            Text("Kelas: $kelas"),
+                            const SizedBox(height: 4),
+                            if (email != null)
+                              Text(
+                                email!,
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 12,
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -149,11 +168,9 @@ class _AkunScreenState extends State<AkunScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const EditScreen(),
+                                  builder: (_) => const EditScreen(),
                                 ),
-                              ).then((_) {
-                                _loadMuridData(); // refresh setelah edit
-                              });
+                              ).then((_) => _loadMuridData());
                             },
                             icon: const Icon(Icons.edit, color: Colors.black),
                           ),
@@ -171,16 +188,108 @@ class _AkunScreenState extends State<AkunScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const UbahkatasandiScreen(),
+                        builder: (_) => const UbahkatasandiScreen(),
                       ),
                     );
                   },
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.logout),
+                  leading: const Icon(Icons.logout, color: Colors.red),
                   title: const Text("Keluar"),
-                  onTap: _logout,
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: true,
+                      builder: (context) {
+                        return Dialog(
+                          backgroundColor: Colors.white,
+                          insetPadding: const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 24,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              20,
+                            ), // ✅ sudut bulat
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(height: 20),
+
+                              // ✅ Teks utama mirip Instagram
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 20),
+                                child: Text(
+                                  "Logout dari akun Anda?",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black87,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
+                              const Divider(height: 1, thickness: 0.8),
+
+                              // 🔴 Tombol Logout
+                              InkWell(
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(20),
+                                  bottomRight: Radius.circular(20),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context); // tutup dialog
+                                  _logout(); // panggil fungsi logout
+                                },
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                  child: Center(
+                                    child: Text(
+                                      "Logout",
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const Divider(height: 1, thickness: 0.8),
+
+                              // ⚫ Tombol Batalkan
+                              InkWell(
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(20),
+                                  bottomRight: Radius.circular(20),
+                                ),
+                                onTap: () => Navigator.pop(context),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                  child: Center(
+                                    child: Text(
+                                      "Batalkan",
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ],
             ),

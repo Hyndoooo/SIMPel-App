@@ -3,8 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class MuridService {
-  // 🧠 Cukup ubah IP di sini aja kalau ganti server
-  final String _ip = "10.183.53.27";
+  final String _ip = "10.118.148.27";
   late final String baseUrl = "http://$_ip:8000/api";
   late final String storageUrl = "http://$_ip:8000/storage/";
 
@@ -24,9 +23,23 @@ class MuridService {
         if (data is Map<String, dynamic> && data.containsKey('data')) {
           final murid = Map<String, dynamic>.from(data['data']);
 
-          // Jika ada foto_profil, buat URL penuh otomatis
+          // 🔹 Pastikan field kelas ada untuk Flutter
+          if (murid['nama_kelas'] != null && murid['nama_kelas'] != '') {
+            murid['kelas'] = murid['nama_kelas'];
+          } else if (murid['kelas_id'] != null) {
+            murid['kelas'] = 'ID: ${murid['kelas_id']}';
+          } else {
+            murid['kelas'] = '-';
+          }
+
           if (murid['foto_profil'] != null && murid['foto_profil'] != '') {
-            murid['foto_profil'] = '$storageUrl${murid['foto_profil']}';
+            if (murid['foto_profil'].startsWith('http')) {
+              // URL penuh dari Google, pakai langsung
+              murid['foto_profil'] = murid['foto_profil'];
+            } else {
+              // Foto manual dari storage
+              murid['foto_profil'] = '$storageUrl${murid['foto_profil']}';
+            }
           } else {
             murid['foto_profil'] = null;
           }
@@ -34,6 +47,7 @@ class MuridService {
           return murid;
         }
       }
+
       print("❌ Gagal ambil data murid: ${response.statusCode}");
       return null;
     } catch (e) {
@@ -48,19 +62,26 @@ class MuridService {
     required String nama,
     required String jenisKelamin,
     required String nomerWhatsapp,
+    String? kelasId,
   }) async {
     final url = Uri.parse('$baseUrl/update-murid');
 
     try {
+      final body = {
+        "email": email,
+        "nama": nama,
+        "jenis_kelamin": jenisKelamin,
+        "nomer_whatsapp": nomerWhatsapp,
+      };
+
+      if (kelasId != null) {
+        body["kelas_id"] = kelasId;
+      }
+
       final response = await http.put(
         url,
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": email,
-          "nama": nama,
-          "jenis_kelamin": jenisKelamin,
-          "nomer_whatsapp": nomerWhatsapp,
-        }),
+        body: jsonEncode(body),
       );
 
       print("📡 PUT: $url");
@@ -84,6 +105,7 @@ class MuridService {
     required String jenisKelamin,
     required String nomerWhatsapp,
     required File fotoProfil,
+    String? kelasId,
   }) async {
     final url = Uri.parse('$baseUrl/update-murid-foto');
 
@@ -94,7 +116,10 @@ class MuridService {
       request.fields['jenis_kelamin'] = jenisKelamin;
       request.fields['nomer_whatsapp'] = nomerWhatsapp;
 
-      // Tambahkan file foto
+      if (kelasId != null) {
+        request.fields['kelas_id'] = kelasId;
+      }
+
       request.files.add(
         await http.MultipartFile.fromPath('foto_profil', fotoProfil.path),
       );
@@ -116,12 +141,63 @@ class MuridService {
     }
   }
 
+  /// Ubah kata sandi murid dengan validasi kombinasi password
+  Future<bool> changePassword({
+    required String email,
+    required String kataSandiLama,
+    required String kataSandiBaru,
+  }) async {
+    // Validasi password baru
+    final hasUppercase = kataSandiBaru.contains(RegExp(r'[A-Z]'));
+    final hasLowercase = kataSandiBaru.contains(RegExp(r'[a-z]'));
+    final hasDigit = kataSandiBaru.contains(RegExp(r'[0-9]'));
+    final hasMinLength = kataSandiBaru.length >= 8;
+
+    if (!(hasUppercase && hasLowercase && hasDigit && hasMinLength)) {
+      print("❌ Password baru tidak memenuhi kriteria kombinasi");
+      return false;
+    }
+
+    final url = Uri.parse('$baseUrl/murid/change-password');
+
+    try {
+      final body = {
+        "email": email.trim(),
+        "kata_sandi_lama": kataSandiLama.trim(),
+        "kata_sandi_baru": kataSandiBaru.trim(),
+      };
+
+      print("📤 Request Change Password: $body");
+
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      );
+
+      print("📡 POST: $url");
+      print("📩 Response: ${response.statusCode} | ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['success'] == true;
+      } else {
+        final data = jsonDecode(response.body);
+        print("❌ Gagal ubah kata sandi: ${data['message']}");
+        return false;
+      }
+    } catch (e) {
+      print("⚠️ Error saat ubah kata sandi: $e");
+      return false;
+    }
+  }
+
   /// Fungsi register murid
   Future<bool> registerMurid({
     required String nis,
     required String nama,
     required String email,
-    required String kelas,
+    required String kelasId,
     required String jenisKelamin,
     required String kataSandi,
     required String nomerWhatsapp,
@@ -136,7 +212,7 @@ class MuridService {
           "nis": nis,
           "nama": nama,
           "email": email,
-          "kelas": kelas,
+          "kelas_id": kelasId,
           "jenis_kelamin": jenisKelamin,
           "kata_sandi": kataSandi,
           "nomer_whatsapp": nomerWhatsapp,
@@ -154,6 +230,38 @@ class MuridService {
     } catch (e) {
       print("⚠️ Error saat register murid: $e");
       return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> registerOrGetMuridGoogle({
+    required String nama,
+    required String email,
+    String? foto,
+  }) async {
+    final url = Uri.parse('$baseUrl/murids/google-register');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"nama": nama, "email": email, "foto": foto ?? ''}),
+      );
+
+      print("📡 POST Google Register: $url");
+      print("📩 Response: ${response.statusCode} | ${response.body}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        if (data["success"] == true) {
+          // Ambil data murid setelah register/login
+          return await getMuridByEmail(email);
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print("⚠️ Error saat register/login Google: $e");
+      return null;
     }
   }
 }

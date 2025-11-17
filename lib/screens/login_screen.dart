@@ -86,79 +86,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // ===================== Login Google =====================
-  Future<User?> signInWithGoogle() async {
-    try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null;
-
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential = await _auth.signInWithCredential(credential);
-      final user = userCredential.user;
-
-      if (user != null) {
-        await _saveUserToDatabase(user);
-      }
-
-      return user;
-    } catch (e) {
-      print("❌ Error Google Sign-In: $e");
-      return null;
-    }
-  }
-
-  Future<void> _saveUserToDatabase(User user) async {
-    try {
-      final muridData = await MuridService().registerOrGetMuridGoogle(
-        nama: user.displayName ?? '',
-        email: user.email ?? '',
-        foto: user.photoURL ?? '',
-      );
-
-      if (muridData != null) await saveUserData(muridData);
-    } catch (e) {
-      print("❌ Error simpan user: $e");
-    }
-  }
-
-  void handleGoogleSignIn() async {
-    final user = await signInWithGoogle();
-
-    if (user != null) {
-      final muridData = await MuridService().registerOrGetMuridGoogle(
-        nama: user.displayName ?? '',
-        email: user.email ?? '',
-        foto: user.photoURL ?? '',
-      );
-
-      if (muridData != null) {
-        await saveUserData(muridData);
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const BerandaScreen()),
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Gagal ambil data murid setelah register"),
-          ),
-        );
-      }
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login Google gagal atau dibatalkan")),
-      );
-    }
-  }
-
   // ===================== Build UI =====================
   @override
   Widget build(BuildContext context) {
@@ -293,34 +220,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Tombol Google Sign-In
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: handleGoogleSignIn,
-                  icon: Image.asset(
-                    'assets/images/google.png',
-                    width: 24,
-                    height: 24,
-                  ),
-                  label: const Text(
-                    "Login dengan Google",
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black87,
-                    side: const BorderSide(color: Colors.grey, width: 0.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 2,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
 
               // Link ke Register
               Row(

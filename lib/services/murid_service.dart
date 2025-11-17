@@ -192,7 +192,7 @@ class MuridService {
     }
   }
 
-  /// Fungsi register murid
+  /// Fungsi register murid (Manual)
   Future<bool> registerMurid({
     required String nis,
     required String nama,
@@ -233,35 +233,53 @@ class MuridService {
     }
   }
 
-  Future<Map<String, dynamic>?> registerOrGetMuridGoogle({
-    required String nama,
+  // Login With Google
+  Future<Map<String, dynamic>?> loginMuridGoogle({
     required String email,
-    String? foto,
   }) async {
-    final url = Uri.parse('$baseUrl/murids/google-register');
+    final url = Uri.parse('$baseUrl/murids/google-login');
 
     try {
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"nama": nama, "email": email, "foto": foto ?? ''}),
+        body: jsonEncode({"email": email}),
       );
 
-      print("📡 POST Google Register: $url");
+      print("📡 POST Google Login: $url");
       print("📩 Response: ${response.statusCode} | ${response.body}");
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data["success"] == true) {
-          // Ambil data murid setelah register/login
-          return await getMuridByEmail(email);
+          return data["data"];
         }
+      } else if (response.statusCode == 404) {
+        // Email belum terdaftar
+        return null;
       }
 
       return null;
     } catch (e) {
-      print("⚠️ Error saat register/login Google: $e");
+      print("⚠️ Error saat login Google: $e");
       return null;
     }
+  }
+
+  // Register With google Validasi NIS
+  Future<Map<String, dynamic>> googleRegisterValidate({
+    required String nama,
+    required String email,
+    String? foto,
+    required String nis,
+  }) async {
+    final url = Uri.parse('$baseUrl/murids/google-register-validate');
+
+    final response = await http.post(
+      url,
+      body: {'nama': nama, 'email': email, 'foto': foto ?? '', 'nis': nis},
+    );
+
+    return json.decode(response.body);
   }
 }

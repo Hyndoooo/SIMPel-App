@@ -47,55 +47,105 @@ class _BerandaScreenState extends State<BerandaScreen> {
     _loadMuridData();
   }
 
+  // Future<void> _loadMuridData() async {
+  //   final prefs = await SharedPreferences.getInstance();
+
+  //   // Ambil data langsung dari SharedPreferences yang disimpan saat registrasi Google
+  //   final namaPrefs = prefs.getString('nama') ?? 'Pengguna';
+  //   final kelasPrefs = prefs.getString('kelas') ?? '-';
+  //   final fotoPrefs = prefs.getString('foto_profil') ?? '';
+
+  //   setState(() {
+  //     nama = namaPrefs;
+  //     kelas = kelasPrefs;
+  //     // Bisa simpan foto ke variabel jika mau ditampilkan
+  //     // fotoProfil = fotoPrefs;
+  //   });
+
+  //   // Opsional: tetap bisa panggil API untuk data lebih lengkap
+  //   final email = prefs.getString('email');
+  //   if (email != null) {
+  //     try {
+  //       final muridService = MuridService();
+  //       final murid = await muridService.getMuridByEmail(email);
+
+  //       if (murid != null) {
+  //         setState(() {
+  //           nama = murid['nama'] ?? namaPrefs;
+  //           kelasId = murid['kelas_id'];
+  //           if (murid['kelas'] is Map) {
+  //             kelas = murid['kelas']['nama_kelas'] ?? kelasPrefs;
+  //           }
+  //         });
+
+  //         if (kelasId != null) {
+  //           await _loadJadwalHariIni(kelasId!);
+  //         }
+  //       }
+  //     } catch (e) {
+  //       print("❌ Error saat load murid: $e");
+  //     }
+  //   }
+
+  //   setState(() {
+  //     isLoadingJadwal = false;
+  //   });
+  // }
+
   Future<void> _loadMuridData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Ambil data langsung dari SharedPreferences
+    final namaPrefs = prefs.getString('nama') ?? 'Pengguna';
+    final kelasPrefs = prefs.getString('kelas') ?? '-';
+    final fotoPrefs = prefs.getString('foto_profil') ?? '';
+
+    setState(() {
+      nama = namaPrefs;
+      kelas = kelasPrefs;
+    });
+
     final email = prefs.getString('email');
-    final namaPrefs = prefs.getString('name') ?? 'Pengguna';
+    if (email != null) {
+      try {
+        final muridService = MuridService();
+        final murid = await muridService.getMuridByEmail(email);
 
-    if (email == null) {
-      print("⚠️ Email belum tersimpan di SharedPreferences");
-      setState(() {
-        nama = namaPrefs;
-        kelas = "-";
-        isLoadingJadwal = false;
-      });
-      return;
-    }
+        if (murid != null) {
+          setState(() {
+            nama = murid['nama'] ?? namaPrefs;
+            kelasId = murid['kelas_id'];
 
-    try {
-      final muridService = MuridService();
-      final murid = await muridService.getMuridByEmail(email);
+            // ==== PERBAIKAN BAGIAN KELAS ====
+            if (murid.containsKey('kelas')) {
+              if (murid['kelas'] is Map) {
+                kelas = murid['kelas']['nama_kelas'] ?? kelasPrefs;
+              } else if (murid['kelas'] is String) {
+                kelas = murid['kelas'];
+              } else {
+                // fallback misal integer ID atau null
+                kelas = kelasPrefs;
+              }
+            } else {
+              kelas = kelasPrefs;
+            }
+          });
 
-      if (murid != null) {
-        setState(() {
-          nama = murid['nama'] ?? namaPrefs;
-          kelasId = murid['kelas_id'];
-          if (murid['kelas'] is String) {
-            kelas = murid['kelas'];
-          } else if (murid['kelas'] is Map) {
-            kelas = murid['kelas']['nama_kelas'] ?? '-';
-          } else {
-            kelas = '-';
+          if (kelasId != null) {
+            await _loadJadwalHariIni(kelasId!);
           }
-        });
-
-        if (kelasId != null) {
-          await _loadJadwalHariIni(kelasId!);
         }
-      } else {
-        // fallback pakai SharedPreferences
+      } catch (e) {
+        print("❌ Error saat load murid: $e");
         setState(() {
-          nama = namaPrefs;
-          kelas = "-";
-          isLoadingJadwal = false;
+          kelas = kelasPrefs; // fallback
         });
       }
-    } catch (e) {
-      print("❌ Error saat load murid: $e");
-      setState(() {
-        isLoadingJadwal = false;
-      });
     }
+
+    setState(() {
+      isLoadingJadwal = false;
+    });
   }
 
   Future<void> _loadJadwalHariIni(int kelasId) async {

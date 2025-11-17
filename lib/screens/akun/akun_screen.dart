@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/murid_service.dart';
 import '../../services/auth_service.dart';
 import '../beranda_screen.dart';
@@ -28,19 +31,29 @@ class _AkunScreenState extends State<AkunScreen> {
 
   final MuridService _muridService = MuridService();
   final AuthService _authService = AuthService();
+  final LocalAuthentication _localAuth = LocalAuthentication();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  bool isFingerprintEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMuridData();
+    // Panggil async functions via Future.microtask
+    Future.microtask(() {
+      _loadMuridData();
+      _loadFingerprintPref();
+    });
   }
 
+  // =========================
+  // Load data murid dari API
+  // =========================
   Future<void> _loadMuridData() async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     email = prefs.getString('email');
-
-    print("📧 Email tersimpan: $email");
 
     if (email == null) {
       setState(() => _isLoading = false);
@@ -48,7 +61,6 @@ class _AkunScreenState extends State<AkunScreen> {
     }
 
     final muridData = await _muridService.getMuridByEmail(email!);
-    print("🧩 Data dari API: $muridData");
 
     if (muridData != null) {
       setState(() {
@@ -61,6 +73,39 @@ class _AkunScreenState extends State<AkunScreen> {
     setState(() => _isLoading = false);
   }
 
+  // =========================
+  // Load preference fingerprint
+  // =========================
+  Future<void> _loadFingerprintPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('fingerprint_enabled') ?? false;
+    setState(() {
+      isFingerprintEnabled = enabled;
+    });
+  }
+
+  // =========================
+  // Toggle fingerprint
+  // =========================
+  Future<void> _toggleFingerprint(bool value) async {
+    // Cek perangkat mendukung fingerprint
+    final canCheck = await _localAuth.canCheckBiometrics;
+    final isSupported = await _localAuth.isDeviceSupported();
+    if (!canCheck || !isSupported) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Perangkat tidak mendukung fingerprint")),
+      );
+      return;
+    }
+
+    setState(() => isFingerprintEnabled = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('fingerprint_enabled', value);
+  }
+
+  // =========================
+  // Navigasi bottom bar
+  // =========================
   void _onNavBarTap(int index) {
     if (index == _currentIndex) return;
     Widget nextPage;
@@ -83,10 +128,27 @@ class _AkunScreenState extends State<AkunScreen> {
     );
   }
 
+  // =========================
+  // Logout
+  // =========================
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+
+    // Simpan status fingerprint sebelum hapus data akun
+    final fingerprintEnabled = prefs.getBool('fingerprint_enabled') ?? false;
+
+    // Hapus hanya data akun, jangan hapus fingerprint
+    await prefs.remove('email');
+    await prefs.remove('nama');
+    await prefs.remove('foto');
+
+    // Kembalikan fingerprint_enabled jika sebelumnya tersimpan
+    await prefs.setBool('fingerprint_enabled', fingerprintEnabled);
+
     await _authService.signOut();
+
+    // Update UI switch
+    setState(() => isFingerprintEnabled = fingerprintEnabled);
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(
@@ -97,6 +159,9 @@ class _AkunScreenState extends State<AkunScreen> {
     }
   }
 
+  // =========================
+  // Build UI
+  // =========================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,6 +175,7 @@ class _AkunScreenState extends State<AkunScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // Info Akun
                 Container(
                   margin: const EdgeInsets.all(16),
                   padding: const EdgeInsets.all(16),
@@ -181,6 +247,23 @@ class _AkunScreenState extends State<AkunScreen> {
                   ),
                 ),
                 const Divider(height: 1),
+
+                // Switch Login Fingerprint
+                ListTile(
+                  title: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Login dengan Sidik Jari"),
+                      Switch(
+                        value: isFingerprintEnabled,
+                        onChanged: _toggleFingerprint,
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+
+                // Ubah Kata Sandi
                 ListTile(
                   leading: const Icon(Icons.settings),
                   title: const Text("Ubah Kata Sandi"),
@@ -194,6 +277,8 @@ class _AkunScreenState extends State<AkunScreen> {
                   },
                 ),
                 const Divider(height: 1),
+
+                // Logout
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.red),
                   title: const Text("Keluar"),
@@ -209,16 +294,12 @@ class _AkunScreenState extends State<AkunScreen> {
                             vertical: 24,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              20,
-                            ), // ✅ sudut bulat
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const SizedBox(height: 20),
-
-                              // ✅ Teks utama mirip Instagram
                               const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 20),
                                 child: Text(
@@ -232,19 +313,16 @@ class _AkunScreenState extends State<AkunScreen> {
                                   ),
                                 ),
                               ),
-
                               const SizedBox(height: 20),
                               const Divider(height: 1, thickness: 0.8),
-
-                              // 🔴 Tombol Logout
                               InkWell(
                                 borderRadius: const BorderRadius.only(
                                   bottomLeft: Radius.circular(20),
                                   bottomRight: Radius.circular(20),
                                 ),
                                 onTap: () {
-                                  Navigator.pop(context); // tutup dialog
-                                  _logout(); // panggil fungsi logout
+                                  Navigator.pop(context);
+                                  _logout();
                                 },
                                 child: const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 14),
@@ -260,10 +338,7 @@ class _AkunScreenState extends State<AkunScreen> {
                                   ),
                                 ),
                               ),
-
                               const Divider(height: 1, thickness: 0.8),
-
-                              // ⚫ Tombol Batalkan
                               InkWell(
                                 borderRadius: const BorderRadius.only(
                                   bottomLeft: Radius.circular(20),

@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../services/murid_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'validasiregisgoogle_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -60,6 +63,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  // Fungsi Register dengan Google
+  Future<void> signInWithGoogle(BuildContext context) async {
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+
+      // ✅ Pastikan logout dulu dari akun Google sebelumnya
+      await googleSignIn.signOut(); // atau disconnect jika mau hapus cache
+      // await googleSignIn.disconnect();
+
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) return;
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+
+      final user = userCredential.user;
+
+      if (user != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ValidasiRegisGoogleScreen(
+              nama: user.displayName!,
+              email: user.email!,
+              foto: user.photoURL,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print("Error Google Login: $e");
+    }
   }
 
   // Ambil daftar kelas dari API GET /api/kelas
@@ -540,7 +586,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   width: double.infinity,
                   height: 50,
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => signInWithGoogle(
+                            context,
+                          ), // kirim context dengan benar
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.grey, width: 0.5),
                       shape: RoundedRectangleBorder(
